@@ -1,0 +1,73 @@
+const mongoose = require("mongoose");
+
+const FileMetaSchema = new mongoose.Schema(
+  {
+    originalName: String,
+    mimeType: String,
+    size: Number,
+    path: String, // public path like /uploads/images/xxx or /uploads/audio/xxx
+    filename: String,
+  },
+  { _id: false }
+);
+
+const SubmissionSchema = new mongoose.Schema(
+  {
+    // Personal
+    fullName: { type: String, required: true },
+    email: { type: String, required: true },
+    phone: String,
+    location: String,
+
+    // Confirmations (map "Yes"/"No" to boolean)
+    hasReadGuidelines: { type: Boolean, default: false },
+    agreedTermsSubmission: { type: Boolean, default: false },
+
+    // Upload type
+    uploadType: {
+      type: String,
+      enum: ["Letter", "Photographs", "Both"],
+      required: true,
+    },
+
+    // Letter section
+    title: String, // comes from req.body.Title
+    letterCategory: String,
+    letterLanguage: String,
+    decade: String,
+    letterImage: FileMetaSchema, // file
+    letterNarrativeFormat: {
+      type: String,
+      enum: ["text", "audio", "both"],
+      default: "text",
+    },
+    letterNarrative: String,
+    letterAudioFile: FileMetaSchema, // file
+    letterNarrativeOptional: String,
+
+    // Photo section
+    photoCaption: String,
+    photoPlace: String,
+    photoImage: FileMetaSchema, // file
+    photoNarrativeFormat: {
+      type: String,
+      enum: ["text", "audio", "both"],
+      default: "text",
+    },
+    photoNarrative: String,
+    photoAudioFile: FileMetaSchema, // file
+    photoNarrativeOptional: String,
+
+    // Verification
+    before2000: { type: String, enum: ["Yes", "No"], default: "No" },
+    // add this field inside SubmissionSchema (top-level alongside before2000 etc.)
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("Submission", SubmissionSchema);
