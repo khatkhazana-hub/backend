@@ -3,6 +3,8 @@ const allowedOrigins = [
   "https://localhost:5173",
   "https://app.veridate.store",
   "https://www.app.veridate.store",
+  "https://longlostletters.com",
+  "https://www.longlostletters.com",
 ];
 
 const corsOptions = {
