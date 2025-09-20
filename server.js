@@ -1,6 +1,6 @@
 // server.js
+require("dotenv").config();  // load first
 const express = require("express");
-const dotenv = require("dotenv");
 const path = require("path");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
@@ -8,8 +8,9 @@ const DatabaseConnection = require("./config/Database");
 const corsOptions = require("./config/corsOptions");
 const submissionRoutes = require("./router/submission.routes");
 const adminRoutes = require("./router/admin.routes");
+const categoryRoutes = require("./router/category.Routes");
 
-dotenv.config();
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,6 +25,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use("/api", submissionRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api", categoryRoutes);
 
 
 app.listen(PORT, () => {

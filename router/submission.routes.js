@@ -7,6 +7,8 @@ const {
   getSubmissionById,
   approveSubmission,
   rejectSubmission,
+  deleteSubmission,
+  updateSubmission,
 } = require("../controllers/submission.controller");
 
 // Map EXACTLY to your form field names
@@ -20,6 +22,8 @@ const fields = [
 router.post("/submissions", upload.fields(fields), createSubmission);
 router.get("/submissions", getSubmissions);
 router.get("/submissions/:id", getSubmissionById);
+router.patch("/submissions/:id", upload.fields(fields), updateSubmission);
+router.delete("/submissions/:id", deleteSubmission);
 
 
 router.patch("/submissions/:id/approve", approveSubmission);

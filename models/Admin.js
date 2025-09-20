@@ -22,7 +22,7 @@ const AdminSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
-      minlength: 8, // be real: 8+ or enforce stronger on controller
+      minlength: 8,
     },
     role: {
       type: String,
@@ -36,6 +36,10 @@ const AdminSchema = new mongoose.Schema(
       default: "active",
     },
     lastLoginAt: Date,
+
+    // new fields for reset flow
+    resetPasswordToken: String,         // sha256 hash
+    resetPasswordExpires: Date,         // Date
   },
   { timestamps: true }
 );
@@ -57,10 +61,12 @@ AdminSchema.methods.comparePassword = function (candidate) {
   return bcrypt.compare(candidate, this.password);
 };
 
-// Remove password when converting to JSON
+// Remove sensitive fields when converting to JSON
 AdminSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
+  delete obj.resetPasswordToken;
+  delete obj.resetPasswordExpires;
   return obj;
 };
 

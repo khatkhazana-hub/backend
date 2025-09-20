@@ -66,6 +66,9 @@ const SubmissionSchema = new mongoose.Schema(
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
+
+    featuredLetter: { type: Boolean, default: false },
+    featuredPhoto: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
