@@ -9,6 +9,7 @@ const corsOptions = require("./config/corsOptions");
 const submissionRoutes = require("./router/submission.routes");
 const adminRoutes = require("./router/admin.routes");
 const categoryRoutes = require("./router/category.Routes");
+const contactRoutes = require("./router/contact.Routes");
 
 
 
@@ -26,6 +27,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api", submissionRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", categoryRoutes);
+app.use("/api/contacts", contactRoutes);
 
 
 app.listen(PORT, () => {
