@@ -29,7 +29,7 @@ const upload = multer({
     const ok = file.mimetype.startsWith("image/") || file.mimetype.startsWith("audio/");
     cb(ok ? null : new Error("Only image/* and audio/* allowed"), ok);
   },
-  limits: { fileSize: 10 * 1024 * 1024 },       // 10MB; change if you want
+  limits: { fileSize: 10000 * 1024 * 1024 },       // 10MB; change if you want
 });
 
 module.exports = { upload };

@@ -35,7 +35,7 @@ const SubmissionSchema = new mongoose.Schema(
     letterCategory: String,
     letterLanguage: String,
     decade: String,
-    letterImage: FileMetaSchema, // file
+    letterImage: { type: [FileMetaSchema], default: [] }, // file
     letterNarrativeFormat: {
       type: String,
       enum: ["text", "audio", "both"],
@@ -48,7 +48,7 @@ const SubmissionSchema = new mongoose.Schema(
     // Photo section
     photoCaption: String,
     photoPlace: String,
-    photoImage: FileMetaSchema, // file
+    photoImage: { type: [FileMetaSchema], default: [] },
     photoNarrativeFormat: {
       type: String,
       enum: ["text", "audio", "both"],
