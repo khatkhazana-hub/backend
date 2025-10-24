@@ -1,6 +1,7 @@
 // controllers/admin.controller.js
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const axios = require("axios");
 const Admin = require("../models/Admin");
 // optional: plug your real mailer here
 const { sendMail } = require("../utils/mailer");
@@ -50,6 +51,47 @@ exports.registerAdmin = async (req, res) => {
 
 exports.loginAdmin = async (req, res) => {
   try {
+    // --- Turnstile verification ---
+    const captchaToken =
+      req.body["cf-turnstile-response"] || req.body.captchaToken || "";
+    if (!captchaToken) {
+      return res.status(400).json({ message: "Captcha token missing." });
+    }
+
+    const secretKey = process.env.CLOUDFLARE_SECRET_KEY;
+    if (!secretKey) {
+      console.error("loginAdmin error: CLOUDFLARE_SECRET_KEY missing");
+      return res
+        .status(500)
+        .json({ message: "Captcha configuration missing on server." });
+    }
+
+    try {
+      const verifyURL =
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+      const { data } = await axios.post(
+        verifyURL,
+        new URLSearchParams({
+          secret: secretKey,
+          response: captchaToken,
+          remoteip: req.ip,
+        })
+      );
+
+      if (!data.success) {
+        console.error("Turnstile verification failed:", data["error-codes"]);
+        return res
+          .status(400)
+          .json({ message: "Captcha verification failed." });
+      }
+    } catch (captchaErr) {
+      console.error("Turnstile verification error:", captchaErr.message);
+      return res
+        .status(502)
+        .json({ message: "Captcha verification error. Please retry." });
+    }
+    // --- end verification ---
+
     const email = normalizeEmail(req.body.email);
     const password = String(req.body.password || "");
 
