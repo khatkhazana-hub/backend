@@ -10,6 +10,7 @@ const submissionRoutes = require("./router/submission.routes");
 const adminRoutes = require("./router/admin.routes");
 const categoryRoutes = require("./router/category.Routes");
 const contactRoutes = require("./router/contact.Routes");
+const subscriptionRoutes = require("./router/subscription.routes");
 
 
 
@@ -28,6 +29,7 @@ app.use("/api", submissionRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", categoryRoutes);
 app.use("/api/contacts", contactRoutes);
+app.use("/api", subscriptionRoutes);
 
 
 app.listen(PORT, () => {

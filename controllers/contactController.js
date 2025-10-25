@@ -1,4 +1,5 @@
 // controllers/contactController.js
+const axios = require("axios");
 const Contact = require("../models/Contact");
 const { sendMail } = require("../utils/mailer");
 
@@ -17,6 +18,44 @@ const requireFields = (body, fields) => {
 };
 
 exports.createContact = asyncHandler(async (req, res) => {
+  const captchaToken =
+    req.body["cf-turnstile-response"] || req.body.captchaToken || "";
+  if (!captchaToken) {
+    return res.status(400).json({ message: "Captcha token missing." });
+  }
+
+  const secretKey = process.env.CLOUDFLARE_SECRET_KEY;
+  if (!secretKey) {
+    console.error("createContact error: missing CLOUDFLARE_SECRET_KEY");
+    return res
+      .status(500)
+      .json({ message: "Captcha configuration missing on server." });
+  }
+
+  try {
+    const verifyURL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+    const { data } = await axios.post(
+      verifyURL,
+      new URLSearchParams({
+        secret: secretKey,
+        response: captchaToken,
+        remoteip: req.ip,
+      })
+    );
+
+    if (!data.success) {
+      console.error("Contact Turnstile failed:", data["error-codes"]);
+      return res
+        .status(400)
+        .json({ message: "Captcha verification failed, please retry." });
+    }
+  } catch (captchaErr) {
+    console.error("Contact Turnstile error:", captchaErr.message);
+    return res
+      .status(502)
+      .json({ message: "Captcha verification error. Please try again." });
+  }
+
   // enforce required only for name + email
   requireFields(req.body, ["name", "email"]);
 
@@ -49,7 +88,7 @@ exports.createContact = asyncHandler(async (req, res) => {
   // notify owner (you)
   try {
     await sendMail({
-      to: "shazimages@gmail.com",
+      to: "khatkhazana@gmail.com",
       subject: `New Contact Submission: ${doc.name}`,
       html: `
         <div style="font-family:Arial,Helvetica,sans-serif;">
