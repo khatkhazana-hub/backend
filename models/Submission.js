@@ -60,7 +60,7 @@ const SubmissionSchema = new mongoose.Schema(
 
     // Verification
     before2000: { type: String, enum: ["Yes", "No"], default: "No" },
-    // add this field inside SubmissionSchema (top-level alongside before2000 etc.)
+    notes: { type: String, default: "" },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],
