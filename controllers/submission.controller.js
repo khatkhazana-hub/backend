@@ -255,7 +255,7 @@ exports.createSubmission = async (req, res) => {
     // --- 4️⃣ Send notification email ---
     try {
       await sendMail({
-        to: "rahil.azhar10@gmail.com",
+        to: "khatkhazana@gmail.com",
         subject: "📩 New Submission Received",
         html: `
           <h2>New Submission Received</h2>

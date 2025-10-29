@@ -19,7 +19,12 @@ exports.createCategory = async (req, res) => {
     const exists = await Category.findOne({ $or: [{ name: name.trim() }, { slug }] });
     if (exists) return res.status(409).json({ error: "Category already exists." });
 
-    const cat = await Category.create({ name: name.trim(), slug });
+    const last = await Category.findOne().sort({ sortOrder: -1 }).select("sortOrder");
+    const cat = await Category.create({
+      name: name.trim(),
+      slug,
+      sortOrder: last ? last.sortOrder + 1 : 0,
+    });
     res.status(201).json(cat);
   } catch (err) {
     console.error("createCategory error:", err);
@@ -29,7 +34,7 @@ exports.createCategory = async (req, res) => {
 
 exports.listCategories = async (req, res) => {
   try {
-    const cats = await Category.find({ active: true }).sort({ name: 1 });
+    const cats = await Category.find({}).sort({ sortOrder: 1, name: 1 });
     res.json(cats);
   } catch (err) {
     res.status(500).json({ error: "Server error fetching categories." });
@@ -65,5 +70,32 @@ exports.deleteCategory = async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Server error deleting category." });
+  }
+};
+
+exports.reorderCategories = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "ids array is required." });
+    }
+
+    const uniqueIds = [...new Set(ids.map((id) => String(id)))];
+    const updates = uniqueIds.map((id, index) => ({
+      updateOne: {
+        filter: { _id: id },
+        update: { sortOrder: index },
+      },
+    }));
+
+    if (updates.length) {
+      await Category.bulkWrite(updates);
+    }
+
+    const cats = await Category.find({}).sort({ sortOrder: 1, name: 1 });
+    res.json(cats);
+  } catch (err) {
+    console.error("reorderCategories error:", err);
+    res.status(500).json({ error: "Server error reordering categories." });
   }
 };

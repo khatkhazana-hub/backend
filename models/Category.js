@@ -1,3 +1,4 @@
+// models/Category.js
 const mongoose = require("mongoose");
 
 const categorySchema = new mongoose.Schema(
@@ -17,8 +18,9 @@ const categorySchema = new mongoose.Schema(
       lowercase: true,
       index: true,
     },
-    // if you ever want to soft-hide a category from the dropdown
     active: { type: Boolean, default: true },
+    // NEW: persistent order (lower = earlier)
+    sortOrder: { type: Number, default: 0, index: true },
   },
   { timestamps: true }
 );
