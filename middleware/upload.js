@@ -1,37 +1,69 @@
-
-
+// upload.js
 const multer = require("multer");
 const { S3Client } = require("@aws-sdk/client-s3");
 const multerS3 = require("multer-s3");
+const mime = require("mime-types");
 
-// 1) region MUST match your bucket (Ohio = us-east-2)
+// --- S3 client: region MUST match your bucket region
 const s3 = new S3Client({ region: "us-east-2" });
 
-// 2) helper to route files into images/ or audio/
+// Allowed MIME types (images)
+const ALLOWED_IMAGE_MIMES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/tiff",
+]);
+
+// pick folder and filename; use mime to decide extension (don’t trust client name)
 function s3Key(req, file, cb) {
   const isAudio = file.mimetype.startsWith("audio/");
-  const folder = isAudio ? "audio" : "images";
-  const ext = (file.originalname.split(".").pop() || "bin").toLowerCase();
-  const name = `${Date.now()}_${file.fieldname}.${ext}`;
-  cb(null, `public/${folder}/${name}`);        // <-- keep under public/
+  const isImage = file.mimetype.startsWith("image/");
+  const folder = isAudio ? "audio" : isImage ? "images" : "other";
+
+  const ext = mime.extension(file.mimetype) || "bin";
+  const safeField = (file.fieldname || "file").replace(/[^\w-]/g, "");
+  const name = `${Date.now()}_${safeField}.${ext}`;
+
+  cb(null, `public/${folder}/${name}`);
 }
 
 const upload = multer({
   storage: multerS3({
     s3,
-    bucket: "khatkhazana",                      // <-- ensure exact bucket name
-    // ❌ DO NOT set `acl` when the bucket has "bucket owner enforced"
-    contentType: multerS3.AUTO_CONTENT_TYPE,    // sets correct Content-Type
+    bucket: "khatkhazana",
+    // don't set `acl` if bucket owner enforced
+    contentType: multerS3.AUTO_CONTENT_TYPE,
     cacheControl: "public, max-age=31536000, immutable",
     key: s3Key,
+    metadata: (req, file, cb) => {
+      cb(null, {
+        originalname: file.originalname,
+      });
+    },
   }),
   fileFilter: (req, file, cb) => {
-    const ok = file.mimetype.startsWith("image/") || file.mimetype.startsWith("audio/");
-    cb(ok ? null : new Error("Only image/* and audio/* allowed"), ok);
+    const isAudio = file.mimetype.startsWith("audio/");
+    const isImage = file.mimetype.startsWith("image/");
+
+    if (!isAudio && !isImage) {
+      return cb(new Error("Only image/* and audio/* are allowed"), false);
+    }
+
+    // Strict image whitelist: JPEG, PNG, WebP, TIFF
+    if (isImage && !ALLOWED_IMAGE_MIMES.has(file.mimetype)) {
+      return cb(
+        new Error("Unsupported image format. Allowed: JPEG, WebP, PNG, TIFF"),
+        false
+      );
+    }
+
+    cb(null, true);
   },
-  limits: { fileSize: 10000 * 1024 * 1024 },       // 10MB; change if you want
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB per file (tune as needed)
+    files: 20,                  // hard cap to mirror the UI
+  },
 });
 
-module.exports = { upload };
-
-
+module.exports = { upload, s3, ALLOWED_IMAGE_MIMES };
