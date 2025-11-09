@@ -50,6 +50,71 @@ const safeUnlink = (absPath) => {
 const yesNoToBool = (v) =>
   ["yes", "true", true, "on", "1"].includes(String(v).toLowerCase());
 
+const MODERATION_STATES = new Set(["pending", "approved", "rejected"]);
+const PART_FIELD_MAP = {
+  letter: "letterStatus",
+  photo: "photoStatus",
+};
+
+const normalizeStatus = (value) => {
+  if (value === undefined || value === null) return null;
+  const next = String(value).toLowerCase();
+  return MODERATION_STATES.has(next) ? next : null;
+};
+
+const statusOrPending = (value) => normalizeStatus(value) || "pending";
+
+const isBothUploadType = (uploadType) =>
+  String(uploadType || "").toLowerCase() === "both";
+
+const deriveCompositeStatus = (
+  uploadType,
+  letterStatus,
+  photoStatus,
+  currentStatus = "pending"
+) => {
+  if (!isBothUploadType(uploadType)) return currentStatus || "pending";
+
+  const fallback = statusOrPending(currentStatus);
+  const letter = normalizeStatus(letterStatus) || fallback;
+  const photo = normalizeStatus(photoStatus) || fallback;
+
+  if (letter === "approved" && photo === "approved") return "approved";
+  if (letter === "rejected" && photo === "rejected") return "rejected";
+  return "pending";
+};
+
+const syncCompositeStatus = (doc, uploadTypeOverride) => {
+  if (!doc) return;
+  const uploadType = uploadTypeOverride || doc.uploadType;
+  if (!isBothUploadType(uploadType)) return;
+  doc.status = deriveCompositeStatus(
+    uploadType,
+    doc.letterStatus,
+    doc.photoStatus,
+    doc.status
+  );
+};
+
+const extractPartFromRequest = (req) => {
+  const raw =
+    req?.body?.part ??
+    req?.query?.part ??
+    req?.body?.scope ??
+    req?.query?.scope;
+
+  if (raw === undefined || raw === null || raw === "") {
+    return { part: null, provided: false };
+  }
+
+  const normalized = String(raw).toLowerCase();
+  if (PART_FIELD_MAP[normalized]) {
+    return { part: normalized, provided: true };
+  }
+
+  return { part: null, provided: true, raw: normalized };
+};
+
 
 
 // exports.createSubmission = async (req, res) => {
@@ -349,6 +414,36 @@ exports.updateSubmission = async (req, res) => {
     setIf("status");
     setIf("notes");
 
+    if (patch.status !== undefined) {
+      const normalizedStatus = normalizeStatus(patch.status);
+      if (!normalizedStatus) {
+        return res
+          .status(400)
+          .json({ message: "Invalid status. Use pending/approved/rejected." });
+      }
+      patch.status = normalizedStatus;
+    }
+
+    if (req.body.letterStatus !== undefined) {
+      const normalized = normalizeStatus(req.body.letterStatus);
+      if (!normalized) {
+        return res.status(400).json({
+          message: "Invalid letterStatus. Use pending/approved/rejected.",
+        });
+      }
+      patch.letterStatus = normalized;
+    }
+
+    if (req.body.photoStatus !== undefined) {
+      const normalized = normalizeStatus(req.body.photoStatus);
+      if (!normalized) {
+        return res.status(400).json({
+          message: "Invalid photoStatus. Use pending/approved/rejected.",
+        });
+      }
+      patch.photoStatus = normalized;
+    }
+
     if (req.body.guidelines !== undefined) {
       patch.hasReadGuidelines = ["yes", "true", true, "on", "1"].includes(
         String(req.body.guidelines).toLowerCase()
@@ -407,6 +502,25 @@ exports.updateSubmission = async (req, res) => {
       patch.photoAudioFile = toFileMeta(files.photoAudioFile[0]);
     }
 
+    const nextUploadType = patch.uploadType || existing.uploadType;
+    if (isBothUploadType(nextUploadType)) {
+      const nextLetter =
+        patch.letterStatus !== undefined
+          ? patch.letterStatus
+          : existing.letterStatus;
+      const nextPhoto =
+        patch.photoStatus !== undefined
+          ? patch.photoStatus
+          : existing.photoStatus;
+
+      patch.status = deriveCompositeStatus(
+        nextUploadType,
+        nextLetter,
+        nextPhoto,
+        patch.status !== undefined ? patch.status : existing.status
+      );
+    }
+
     const updated = await Submission.findByIdAndUpdate(id, patch, {
       new: true,
       runValidators: true,
@@ -442,37 +556,58 @@ exports.deleteSubmission = async (req, res) => {
   }
 };
 
-exports.approveSubmission = async (req, res) => {
+const runModeration = async (req, res, nextStatus, logLabel) => {
   try {
-    const doc = await Submission.findByIdAndUpdate(
-      req.params.id,
-      { status: "approved" },
-      { new: true }
-    );
+    const partInfo = extractPartFromRequest(req);
+    if (partInfo.provided && !partInfo.part) {
+      return res.status(400).json({
+        message: 'Invalid part. Use "letter" or "photo".',
+      });
+    }
+
+    const doc = await Submission.findById(req.params.id);
     if (!doc) return res.status(404).json({ message: "Not found" });
-    res.json({ message: "Submission approved", data: doc });
+
+    if (partInfo.part) {
+      if (!isBothUploadType(doc.uploadType)) {
+        return res.status(400).json({
+          message: "Partial moderation is only available for Both submissions.",
+        });
+      }
+      const field = PART_FIELD_MAP[partInfo.part];
+      doc[field] = nextStatus;
+    } else {
+      doc.status = nextStatus;
+      if (isBothUploadType(doc.uploadType)) {
+        doc.letterStatus = nextStatus;
+        doc.photoStatus = nextStatus;
+      }
+    }
+
+    syncCompositeStatus(doc);
+    await doc.save();
+
+    const subject =
+      partInfo.part === "letter"
+        ? "Letter"
+        : partInfo.part === "photo"
+        ? "Photograph"
+        : "Submission";
+
+    return res.json({
+      message: `${subject} ${nextStatus}.`,
+      data: doc,
+    });
   } catch (err) {
-    console.error("approveSubmission error:", err);
-    res
+    console.error(`${logLabel} error:`, err);
+    return res
       .status(500)
       .json({ message: "Internal server error", error: err.message });
   }
 };
 
+exports.approveSubmission = (req, res) =>
+  runModeration(req, res, "approved", "approveSubmission");
 
-exports.rejectSubmission = async (req, res) => {
-  try {
-    const doc = await Submission.findByIdAndUpdate(
-      req.params.id,
-      { status: "rejected" },
-      { new: true }
-    );
-    if (!doc) return res.status(404).json({ message: "Not found" });
-    res.json({ message: "Submission rejected", data: doc });
-  } catch (err) {
-    console.error("rejectSubmission error:", err);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: err.message });
-  }
-};
+exports.rejectSubmission = (req, res) =>
+  runModeration(req, res, "rejected", "rejectSubmission");
