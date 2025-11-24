@@ -3,6 +3,7 @@ const multer = require("multer");
 const { S3Client } = require("@aws-sdk/client-s3");
 const multerS3 = require("multer-s3");
 const mime = require("mime-types");
+const crypto = require("crypto");
 
 // --- S3 client: region MUST match your bucket region
 const s3 = new S3Client({ region: "us-east-2" });
@@ -23,7 +24,8 @@ function s3Key(req, file, cb) {
 
   const ext = mime.extension(file.mimetype) || "bin";
   const safeField = (file.fieldname || "file").replace(/[^\w-]/g, "");
-  const name = `${Date.now()}_${safeField}.${ext}`;
+  const unique = crypto.randomBytes(6).toString("hex"); // avoid S3 key collisions
+  const name = `${Date.now()}_${unique}_${safeField}.${ext}`;
 
   cb(null, `public/${folder}/${name}`);
 }
