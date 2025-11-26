@@ -11,6 +11,8 @@ const adminRoutes = require("./router/admin.routes");
 const categoryRoutes = require("./router/category.Routes");
 const contactRoutes = require("./router/contact.Routes");
 const subscriptionRoutes = require("./router/subscription.routes");
+const checkoutRoutes = require("./router/checkout.routes");
+const productRoutes = require("./router/product.routes");
 
 
 
@@ -30,6 +32,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api", categoryRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api", subscriptionRoutes);
+app.use("/api/checkout", checkoutRoutes);
+app.use("/api", productRoutes);
 
 
 app.listen(PORT, () => {

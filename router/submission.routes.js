@@ -1,4 +1,5 @@
 const express = require("express");
+const multer = require("multer");
 const router = express.Router();
 const { upload } = require("../middleware/upload");
 const {
@@ -19,10 +20,34 @@ const fields = [
   { name: "photoAudioFile", maxCount: 5 },
 ];
 
-router.post("/submissions", upload.fields(fields), createSubmission);
+const uploadFields = upload.fields(fields);
+
+const handleMulterError = (err, res) => {
+  if (err instanceof multer.MulterError) {
+    let message = err.message;
+    if (err.code === "LIMIT_FILE_SIZE") {
+      message = "File too large. Max 10MB per file.";
+    } else if (err.code === "LIMIT_FILE_COUNT") {
+      message = "Too many files. Please upload fewer files.";
+    } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
+      message = "Unexpected file field. Check the selected inputs.";
+    }
+    return res.status(400).json({ message });
+  }
+  return res.status(400).json({ message: err.message || "Upload failed." });
+};
+
+const withUpload = (handler) => (req, res, next) => {
+  uploadFields(req, res, (err) => {
+    if (err) return handleMulterError(err, res);
+    return handler(req, res, next);
+  });
+};
+
+router.post("/submissions", withUpload(createSubmission));
 router.get("/submissions", getSubmissions);
 router.get("/submissions/:id", getSubmissionById);
-router.patch("/submissions/:id", upload.fields(fields), updateSubmission);
+router.patch("/submissions/:id", withUpload(updateSubmission));
 router.delete("/submissions/:id", deleteSubmission);
 
 router.post("/debug-upload", upload.any(), (req, res) => {

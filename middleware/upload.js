@@ -63,7 +63,7 @@ const upload = multer({
     cb(null, true);
   },
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB per file (tune as needed)
+    fileSize: 30 * 1024 * 1024, // 10MB per file (tune as needed)
     files: 20,                  // hard cap to mirror the UI
   },
 });
